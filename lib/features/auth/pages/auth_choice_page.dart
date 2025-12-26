@@ -1,3 +1,5 @@
+import '../../auth/presentation/pages/signup_page.dart';
+import '../../auth/presentation/pages/login_page.dart';
 import '../../setup/pages/setup_profile_page.dart';
 import 'package:flutter/material.dart';
 
@@ -61,7 +63,12 @@ class AuthChoicePage extends StatelessWidget {
                     'Secure backup & sync across all your devices instantly.',
                 icon: Icons.cloud_upload_outlined,
                 isRecommended: true,
-                onTap: () {},
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SignUpPage()),
+                  );
+                },
               ),
               const SizedBox(height: 16),
               _buildAuthOption(
@@ -80,7 +87,12 @@ class AuthChoicePage extends StatelessWidget {
               const Spacer(),
               Center(
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LoginPage()),
+                    );
+                  },
                   child: const Text.rich(
                     TextSpan(
                       text: 'Already have an account? ',

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/services/sound_service.dart';
 
 class FocusChoiceModal extends StatefulWidget {
-  final Function(FocusActivity) onSelected;
+  final Function(FocusActivity, int) onSelected; // Added duration parameter
 
   const FocusChoiceModal({super.key, required this.onSelected});
 
@@ -12,6 +12,9 @@ class FocusChoiceModal extends StatefulWidget {
 
 class _FocusChoiceModalState extends State<FocusChoiceModal> {
   FocusActivity? _selected;
+  int _selectedDuration = 25; // Default Pomodoro duration
+
+  final List<int> _durations = [15, 25, 45, 60]; // Duration options in minutes
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +43,68 @@ class _FocusChoiceModalState extends State<FocusChoiceModal> {
             style: TextStyle(color: Colors.grey[400], fontSize: 14),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
+
+          // Duration Selector
+          Text(
+            'Session Duration',
+            style: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: _durations.map((duration) {
+              final isSelected = _selectedDuration == duration;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedDuration = duration),
+                  child: Container(
+                    margin: EdgeInsets.only(
+                      right: duration == _durations.last ? 0 : 8,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFF8B3DFF).withValues(alpha: 0.2)
+                          : const Color(0xFF1D1B26),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? const Color(0xFF8B3DFF)
+                            : Colors.white.withValues(alpha: 0.1),
+                      ),
+                    ),
+                    child: Text(
+                      '${duration}m',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isSelected
+                            ? const Color(0xFF8B3DFF)
+                            : Colors.grey[400],
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 24),
+
+          Text(
+            'Activity Type',
+            style: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
           ...FocusActivity.values.map(
             (activity) => _buildActivityCard(activity),
           ),
@@ -49,7 +113,7 @@ class _FocusChoiceModalState extends State<FocusChoiceModal> {
             onPressed: _selected == null
                 ? null
                 : () {
-                    widget.onSelected(_selected!);
+                    widget.onSelected(_selected!, _selectedDuration);
                     Navigator.pop(context);
                   },
             style: ElevatedButton.styleFrom(

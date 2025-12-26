@@ -1,0 +1,19 @@
+  Future<void> _loadUrgesCount() async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthAuthenticated) {
+      final getUrgesCount = getIt<GetTodayUrgesCount>();
+      final result = await getUrgesCount(authState.user.id);
+      result.fold(
+        (failure) {
+          // Silently fail, keep showing 0
+        },
+        (count) {
+          if (mounted) {
+            setState(() {
+              _todayUrgesCount = count;
+            });
+          }
+        },
+      );
+    }
+  }

@@ -1,9 +1,11 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import '../../home/pages/home_page.dart';
 import '../../heatmap/pages/heatmap_page.dart';
 import '../../sessions/pages/sessions_page.dart';
 import '../../settings/pages/settings_page.dart';
 
+@RoutePage()
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
 
@@ -51,9 +53,9 @@ class _MainPageState extends State<MainPage> {
               label: 'Sessions',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined),
-              activeIcon: Icon(Icons.settings),
-              label: 'Settings',
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Profile',
             ),
           ],
         ),

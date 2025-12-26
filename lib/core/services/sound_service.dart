@@ -1,26 +1,10 @@
 import 'package:audioplayers/audioplayers.dart';
 
 enum FocusActivity {
-  homework(
-    'Homework',
-    'Zen Forest',
-    'https://cdn.pixabay.com/audio/2022/10/16/audio_24a66a1615.mp3',
-  ),
-  presentation(
-    'Presentation',
-    'Soft Rain',
-    'https://cdn.pixabay.com/audio/2022/03/10/audio_291079313b.mp3',
-  ),
-  project(
-    'Core Project',
-    'Meditative Lo-fi',
-    'https://cdn.pixabay.com/audio/2022/02/07/audio_83a510d947.mp3',
-  ),
-  leetcode(
-    'LeetCode/Logic',
-    'Deep Brown Noise',
-    'https://cdn.pixabay.com/audio/2024/02/06/audio_55a29f8f7c.mp3',
-  );
+  homework('Homework', 'Homework Sound', 'sounds/Homework.mp3'),
+  presentation('Presentation', 'Presentation Sound', 'sounds/Presentation.mp3'),
+  project('Core Project', 'Project Sound', 'sounds/Project.mp3'),
+  leetcode('LeetCode/Logic', 'LeetCode Sound', 'sounds/leetcode.mp3');
 
   final String label;
   final String soundLabel;
@@ -38,6 +22,9 @@ class SoundService {
 
   final AudioPlayer _player = AudioPlayer();
   FocusActivity? _currentActivity;
+  bool _isMuted = false;
+
+  bool get isMuted => _isMuted;
 
   Future<void> _init() async {
     try {
@@ -69,7 +56,7 @@ class SoundService {
       await _player.setReleaseMode(ReleaseMode.loop);
 
       // Use Source to play
-      final source = UrlSource(activity.soundUrl);
+      final source = AssetSource(activity.soundUrl);
       await _player.play(source);
 
       print('Playing sound for ${activity.label}: ${activity.soundUrl}');
@@ -91,5 +78,10 @@ class SoundService {
 
   Future<void> setVolume(double volume) async {
     await _player.setVolume(volume);
+  }
+
+  Future<void> toggleMute() async {
+    _isMuted = !_isMuted;
+    await _player.setVolume(_isMuted ? 0.0 : 1.0);
   }
 }

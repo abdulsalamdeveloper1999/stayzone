@@ -3,9 +3,18 @@ import '../widgets/focus_timer_widget.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/insight_card.dart';
 import '../widgets/sos_urge_widget.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../auth/presentation/bloc/auth_bloc.dart';
 import '../../interventions/pages/reflection_delay_page.dart';
 import '../../interventions/pages/controlled_break_page.dart';
 import '../../../core/services/notification_service.dart';
+import '../../../core/utils/level_utils.dart';
+import '../../focus/domain/usecases/create_focus_session.dart';
+import '../../focus/domain/usecases/complete_focus_session.dart';
+import '../../focus/domain/usecases/get_today_stats.dart';
+import '../../focus/domain/usecases/get_user_streak.dart';
+import '../../urges/domain/usecases/get_today_urges_count.dart';
+import '../../../core/di/injection.dart';
 import '../../../core/services/break_service.dart';
 import '../../../core/services/sound_service.dart';
 import '../widgets/focus_choice_modal.dart';
@@ -23,10 +32,66 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int _remainingSeconds = 25 * 60; // 25 minutes default
   int _totalSeconds = 25 * 60;
 
+  // Session tracking
+  String? _currentSessionId;
+  DateTime? _sessionStartTime;
+  String? _currentActivity;
+  int _todayTotalMinutes = 0;
+  int _userStreak = 0;
+  int _todayUrgesCount = 0;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _loadTodayStats();
+    _loadStreak();
+    _loadUrgesCount();
+  }
+
+  Future<void> _loadTodayStats() async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthAuthenticated) {
+      final getTodayStats = getIt<GetTodayStats>();
+      final result = await getTodayStats(authState.user.id);
+      result.fold((failure) {}, (minutes) {
+        if (mounted) {
+          setState(() {
+            _todayTotalMinutes = minutes;
+          });
+        }
+      });
+    }
+  }
+
+  Future<void> _loadStreak() async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthAuthenticated) {
+      final getUserStreak = getIt<GetUserStreak>();
+      final result = await getUserStreak(authState.user.id);
+      result.fold((failure) {}, (streak) {
+        if (mounted) {
+          setState(() {
+            _userStreak = streak;
+          });
+        }
+      });
+    }
+  }
+
+  Future<void> _loadUrgesCount() async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthAuthenticated) {
+      final getUrgesCount = getIt<GetTodayUrgesCount>();
+      final result = await getUrgesCount(authState.user.id);
+      result.fold((failure) {}, (count) {
+        if (mounted) {
+          setState(() {
+            _todayUrgesCount = count;
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -140,30 +205,30 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               IntrinsicHeight(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: const [
+                  children: [
                     Expanded(
                       child: StatCard(
-                        label: 'Today\'s Focus',
-                        value: '4h 20m',
-                        icon: Icons.timer_outlined,
+                        icon: Icons.timer,
+                        value: _formatMinutesToHoursMinutes(_todayTotalMinutes),
+                        label: "Today's Focus",
                         color: Color(0xFF8B3DFF),
                       ),
                     ),
                     SizedBox(width: 12),
                     Expanded(
                       child: StatCard(
+                        icon: Icons.block,
+                        value: _todayUrgesCount.toString(),
                         label: 'Blocked',
-                        value: '12',
-                        icon: Icons.block_outlined,
                         color: Color(0xFF6366F1),
                       ),
                     ),
                     SizedBox(width: 12),
                     Expanded(
                       child: StatCard(
+                        icon: Icons.local_fire_department,
+                        value: _userStreak.toString(),
                         label: 'Streak',
-                        value: '5',
-                        icon: Icons.local_fire_department_outlined,
                         color: Color(0xFFE11D48),
                       ),
                     ),
@@ -285,14 +350,45 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (modalContext) => FocusChoiceModal(
-        onSelected: (activity) async {
+        onSelected: (activity, duration) async {
           final messenger = ScaffoldMessenger.of(context);
           try {
             await SoundService().playForActivity(activity);
-            if (!mounted) return;
-            setState(() {
-              _startTimer();
-            });
+
+            // Create session in database
+            final authState = context.read<AuthBloc>().state;
+            if (authState is AuthAuthenticated) {
+              final createSession = getIt<CreateFocusSession>();
+              final result = await createSession(
+                CreateFocusSessionParams(
+                  userId: authState.user.id,
+                  activityType: activity.label,
+                  durationMinutes: duration,
+                ),
+              );
+
+              result.fold(
+                (failure) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Failed to start session: ${failure.message}',
+                      ),
+                      backgroundColor: Colors.red[900],
+                    ),
+                  );
+                },
+                (session) {
+                  if (!mounted) return;
+                  setState(() {
+                    _currentSessionId = session.id;
+                    _sessionStartTime = DateTime.now();
+                    _currentActivity = activity.label;
+                    _startTimer(duration);
+                  });
+                },
+              );
+            }
           } catch (e) {
             if (!mounted) return;
             messenger.showSnackBar(
@@ -309,17 +405,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  void _startTimer() {
+  void _startTimer(int durationMinutes) {
     _timer?.cancel();
-    _remainingSeconds = 25 * 60;
-    _totalSeconds = 25 * 60;
+    _totalSeconds = durationMinutes * 60;
+    _remainingSeconds = _totalSeconds;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingSeconds > 0) {
         setState(() {
           _remainingSeconds--;
         });
       } else {
-        _stopTimer();
+        _timer?.cancel();
         // Maybe play a completion sound
       }
     });
@@ -523,12 +619,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return "${duration.inHours > 0 ? '${duration.inHours}:' : ''}$twoDigitMinutes:$twoDigitSeconds";
   }
 
-  String _formatSeconds(int totalSeconds) {
-    int minutes = totalSeconds ~/ 60;
-    int seconds = totalSeconds % 60;
-    String minStr = minutes.toString().padLeft(2, '0');
-    String secStr = seconds.toString().padLeft(2, '0');
-    return '$minStr:$secStr';
+  String _formatSeconds(int seconds) {
+    final minutes = seconds ~/ 60;
+    final secs = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  }
+
+  String _formatMinutesToHoursMinutes(int totalMinutes) {
+    if (totalMinutes == 0) return '0m';
+
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+
+    if (hours == 0) {
+      return '${minutes}m';
+    } else if (minutes == 0) {
+      return '${hours}h';
+    } else {
+      return '${hours}h ${minutes}m';
+    }
   }
 
   String _getRandomVictoryMessage() {
