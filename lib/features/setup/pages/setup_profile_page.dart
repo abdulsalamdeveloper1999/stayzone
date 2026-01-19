@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:stayzone/features/setup/pages/select_apps_page.dart';
+import 'package:aether_focus/features/setup/pages/select_apps_page.dart';
 import '../../main/pages/main_page.dart';
 
 class SetupProfilePage extends StatefulWidget {

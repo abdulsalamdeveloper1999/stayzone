@@ -13,6 +13,7 @@ _$UrgeReportModelImpl _$$UrgeReportModelImplFromJson(
       userId: json['user_id'] as String,
       interventionType: json['intervention_type'] as String,
       reportedAt: DateTime.parse(json['reported_at'] as String),
+      content: json['content'] as String?,
     );
 
 Map<String, dynamic> _$$UrgeReportModelImplToJson(
@@ -22,4 +23,5 @@ Map<String, dynamic> _$$UrgeReportModelImplToJson(
       'user_id': instance.userId,
       'intervention_type': instance.interventionType,
       'reported_at': instance.reportedAt.toIso8601String(),
+      'content': instance.content,
     };

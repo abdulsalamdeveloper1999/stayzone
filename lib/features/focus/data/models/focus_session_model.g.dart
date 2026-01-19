@@ -18,6 +18,7 @@ _$FocusSessionModelImpl _$$FocusSessionModelImplFromJson(
       completedAt: json['completed_at'] == null
           ? null
           : DateTime.parse(json['completed_at'] as String),
+      title: json['title'] as String?,
       wasCompleted: json['was_completed'] as bool? ?? false,
     );
 
@@ -31,5 +32,6 @@ Map<String, dynamic> _$$FocusSessionModelImplToJson(
       'completed_minutes': instance.completedMinutes,
       'started_at': instance.startedAt.toIso8601String(),
       'completed_at': instance.completedAt?.toIso8601String(),
+      'title': instance.title,
       'was_completed': instance.wasCompleted,
     };

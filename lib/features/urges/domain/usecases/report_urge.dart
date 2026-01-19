@@ -16,6 +16,7 @@ class ReportUrge implements UseCase<UrgeReportEntity, ReportUrgeParams> {
     return repository.reportUrge(
       userId: params.userId,
       interventionType: params.interventionType,
+      content: params.content,
     );
   }
 }
@@ -23,6 +24,11 @@ class ReportUrge implements UseCase<UrgeReportEntity, ReportUrgeParams> {
 class ReportUrgeParams {
   final String userId;
   final String interventionType;
+  final String? content;
 
-  ReportUrgeParams({required this.userId, required this.interventionType});
+  ReportUrgeParams({
+    required this.userId,
+    required this.interventionType,
+    this.content,
+  });
 }

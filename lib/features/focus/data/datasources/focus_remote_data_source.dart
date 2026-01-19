@@ -8,6 +8,7 @@ abstract class FocusRemoteDataSource {
     required String userId,
     required String activityType,
     required int durationMinutes,
+    String? title,
   });
 
   Future<FocusSessionModel> completeSession({
@@ -18,6 +19,10 @@ abstract class FocusRemoteDataSource {
   Future<int> getTodaysFocusMinutes(String userId);
 
   Future<int> getUserStreak(String userId);
+
+  Future<List<FocusSessionModel>> getFocusHistory(String userId);
+
+  Future<Map<String, dynamic>> getMonkStats();
 }
 
 @LazySingleton(as: FocusRemoteDataSource)
@@ -31,6 +36,7 @@ class FocusRemoteDataSourceImpl implements FocusRemoteDataSource {
     required String userId,
     required String activityType,
     required int durationMinutes,
+    String? title,
   }) async {
     try {
       final response = await supabaseClient
@@ -40,7 +46,8 @@ class FocusRemoteDataSourceImpl implements FocusRemoteDataSource {
             'activity_type': activityType,
             'duration_minutes': durationMinutes,
             'completed_minutes': 0,
-            'started_at': DateTime.now().toIso8601String(),
+            'title': title,
+            'started_at': DateTime.now().toUtc().toIso8601String(),
             'was_completed': false,
           })
           .select()
@@ -62,7 +69,7 @@ class FocusRemoteDataSourceImpl implements FocusRemoteDataSource {
           .from('focus_sessions')
           .update({
             'completed_minutes': completedMinutes,
-            'completed_at': DateTime.now().toIso8601String(),
+            'completed_at': DateTime.now().toUtc().toIso8601String(),
             'was_completed': true,
           })
           .eq('id', sessionId)
@@ -79,7 +86,7 @@ class FocusRemoteDataSourceImpl implements FocusRemoteDataSource {
   Future<int> getTodaysFocusMinutes(String userId) async {
     try {
       final now = DateTime.now();
-      final startOfDay = DateTime(now.year, now.month, now.day);
+      final startOfDay = DateTime(now.year, now.month, now.day).toUtc();
       final endOfDay = startOfDay.add(const Duration(days: 1));
 
       final response = await supabaseClient
@@ -120,7 +127,9 @@ class FocusRemoteDataSourceImpl implements FocusRemoteDataSource {
       final now = DateTime.now();
 
       for (final session in response) {
-        final completedAt = DateTime.parse(session['completed_at'] as String);
+        final completedAt = DateTime.parse(
+          session['completed_at'] as String,
+        ).toLocal();
         final dateOnly = DateTime(
           completedAt.year,
           completedAt.month,
@@ -156,6 +165,38 @@ class FocusRemoteDataSourceImpl implements FocusRemoteDataSource {
       return streak;
     } catch (e) {
       throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<List<FocusSessionModel>> getFocusHistory(String userId) async {
+    try {
+      final response = await supabaseClient
+          .from('focus_sessions')
+          .select()
+          .eq('user_id', userId)
+          .eq('was_completed', true)
+          .order('completed_at', ascending: false);
+
+      return (response as List)
+          .map((json) => FocusSessionModel.fromJson(json))
+          .toList();
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getMonkStats() async {
+    try {
+      final response = await supabaseClient
+          .from('active_monk_stats')
+          .select()
+          .single();
+      return response;
+    } catch (e) {
+      // Fallback if view fails or is empty
+      return {'total_active': 0, 'recent_titles': []};
     }
   }
 }

@@ -336,6 +336,10 @@ class AppTheme {
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: colorScheme.primary,
       ),
+      actionIconTheme: ActionIconThemeData(
+        backButtonIconBuilder: (BuildContext context) =>
+            const Icon(Icons.arrow_back_ios_new),
+      ),
     );
   }
 
@@ -623,6 +627,10 @@ class AppTheme {
       // Progress Indicator - Using colorScheme
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: colorScheme.primary,
+      ),
+      actionIconTheme: ActionIconThemeData(
+        backButtonIconBuilder: (BuildContext context) =>
+            const Icon(Icons.arrow_back_ios_new),
       ),
     );
   }

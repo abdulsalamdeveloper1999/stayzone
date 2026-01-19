@@ -1,10 +1,12 @@
+import 'dart:math'; // Added for randomization
 import 'package:audioplayers/audioplayers.dart';
 
 enum FocusActivity {
   homework('Homework', 'Homework Sound', 'sounds/Homework.mp3'),
   presentation('Presentation', 'Presentation Sound', 'sounds/Presentation.mp3'),
   project('Core Project', 'Project Sound', 'sounds/Project.mp3'),
-  leetcode('LeetCode/Logic', 'LeetCode Sound', 'sounds/leetcode.mp3');
+  leetcode('LeetCode/Logic', 'LeetCode Sound', 'sounds/leetcode.mp3'),
+  other('Other', 'Calm Focus', 'sounds/Project.mp3');
 
   final String label;
   final String soundLabel;
@@ -55,11 +57,21 @@ class SoundService {
       // Set release mode to loop for ambient sounds
       await _player.setReleaseMode(ReleaseMode.loop);
 
+      String soundUrl = activity.soundUrl;
+      if (activity == FocusActivity.other) {
+        // Pick a random sound from the other available categories
+        final availableSounds = FocusActivity.values
+            .where((a) => a != FocusActivity.other)
+            .map((a) => a.soundUrl)
+            .toList();
+        soundUrl = availableSounds[Random().nextInt(availableSounds.length)];
+      }
+
       // Use Source to play
-      final source = AssetSource(activity.soundUrl);
+      final source = AssetSource(soundUrl);
       await _player.play(source);
 
-      print('Playing sound for ${activity.label}: ${activity.soundUrl}');
+      print('Playing sound for ${activity.label}: $soundUrl');
     } catch (e) {
       print('Error playing focus sound: $e');
       _currentActivity = null;

@@ -20,6 +20,7 @@ class CreateFocusSession
       userId: params.userId,
       activityType: params.activityType,
       durationMinutes: params.durationMinutes,
+      title: params.title,
     );
   }
 }
@@ -28,10 +29,12 @@ class CreateFocusSessionParams {
   final String userId;
   final String activityType;
   final int durationMinutes;
+  final String? title;
 
   CreateFocusSessionParams({
     required this.userId,
     required this.activityType,
     required this.durationMinutes,
+    this.title,
   });
 }

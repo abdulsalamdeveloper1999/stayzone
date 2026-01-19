@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../core/services/sound_service.dart';
 
 class FocusChoiceModal extends StatefulWidget {
-  final Function(FocusActivity, int) onSelected; // Added duration parameter
+  final Function(FocusActivity, int, String?)
+  onSelected; // Added title parameter
 
   const FocusChoiceModal({super.key, required this.onSelected});
 
@@ -13,6 +14,13 @@ class FocusChoiceModal extends StatefulWidget {
 class _FocusChoiceModalState extends State<FocusChoiceModal> {
   FocusActivity? _selected;
   int _selectedDuration = 25; // Default Pomodoro duration
+  final TextEditingController _titleController = TextEditingController();
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    super.dispose();
+  }
 
   final List<int> _durations = [15, 25, 45, 60]; // Duration options in minutes
 
@@ -108,12 +116,47 @@ class _FocusChoiceModalState extends State<FocusChoiceModal> {
           ...FocusActivity.values.map(
             (activity) => _buildActivityCard(activity),
           ),
+          if (_selected == FocusActivity.other) ...[
+            const SizedBox(height: 16),
+            TextField(
+              controller: _titleController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'What are you focusing on?',
+                hintStyle: TextStyle(color: Colors.grey[600]),
+                filled: true,
+                fillColor: const Color(0xFF1D1B26),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: const Color(0xFF8B3DFF).withValues(alpha: 0.3),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: Color(0xFF8B3DFF)),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: _selected == null
                 ? null
                 : () {
-                    widget.onSelected(_selected!, _selectedDuration);
+                    widget.onSelected(
+                      _selected!,
+                      _selectedDuration,
+                      _selected == FocusActivity.other
+                          ? _titleController.text.trim()
+                          : null,
+                    );
                     Navigator.pop(context);
                   },
             style: ElevatedButton.styleFrom(
@@ -205,6 +248,8 @@ class _FocusChoiceModalState extends State<FocusChoiceModal> {
         return Icons.code;
       case FocusActivity.leetcode:
         return Icons.psychology;
+      case FocusActivity.other:
+        return Icons.rocket_launch_rounded;
     }
   }
 }

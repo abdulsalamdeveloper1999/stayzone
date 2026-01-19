@@ -33,6 +33,7 @@ mixin _$FocusSessionModel {
   DateTime get startedAt => throw _privateConstructorUsedError;
   @JsonKey(name: 'completed_at')
   DateTime? get completedAt => throw _privateConstructorUsedError;
+  String? get title => throw _privateConstructorUsedError;
   @JsonKey(name: 'was_completed')
   bool get wasCompleted => throw _privateConstructorUsedError;
 
@@ -56,6 +57,7 @@ abstract class $FocusSessionModelCopyWith<$Res> {
       @JsonKey(name: 'completed_minutes') int completedMinutes,
       @JsonKey(name: 'started_at') DateTime startedAt,
       @JsonKey(name: 'completed_at') DateTime? completedAt,
+      String? title,
       @JsonKey(name: 'was_completed') bool wasCompleted});
 }
 
@@ -79,6 +81,7 @@ class _$FocusSessionModelCopyWithImpl<$Res, $Val extends FocusSessionModel>
     Object? completedMinutes = null,
     Object? startedAt = null,
     Object? completedAt = freezed,
+    Object? title = freezed,
     Object? wasCompleted = null,
   }) {
     return _then(_value.copyWith(
@@ -110,6 +113,10 @@ class _$FocusSessionModelCopyWithImpl<$Res, $Val extends FocusSessionModel>
           ? _value.completedAt
           : completedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      title: freezed == title
+          ? _value.title
+          : title // ignore: cast_nullable_to_non_nullable
+              as String?,
       wasCompleted: null == wasCompleted
           ? _value.wasCompleted
           : wasCompleted // ignore: cast_nullable_to_non_nullable
@@ -134,6 +141,7 @@ abstract class _$$FocusSessionModelImplCopyWith<$Res>
       @JsonKey(name: 'completed_minutes') int completedMinutes,
       @JsonKey(name: 'started_at') DateTime startedAt,
       @JsonKey(name: 'completed_at') DateTime? completedAt,
+      String? title,
       @JsonKey(name: 'was_completed') bool wasCompleted});
 }
 
@@ -155,6 +163,7 @@ class __$$FocusSessionModelImplCopyWithImpl<$Res>
     Object? completedMinutes = null,
     Object? startedAt = null,
     Object? completedAt = freezed,
+    Object? title = freezed,
     Object? wasCompleted = null,
   }) {
     return _then(_$FocusSessionModelImpl(
@@ -186,6 +195,10 @@ class __$$FocusSessionModelImplCopyWithImpl<$Res>
           ? _value.completedAt
           : completedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      title: freezed == title
+          ? _value.title
+          : title // ignore: cast_nullable_to_non_nullable
+              as String?,
       wasCompleted: null == wasCompleted
           ? _value.wasCompleted
           : wasCompleted // ignore: cast_nullable_to_non_nullable
@@ -205,6 +218,7 @@ class _$FocusSessionModelImpl extends _FocusSessionModel {
       @JsonKey(name: 'completed_minutes') required this.completedMinutes,
       @JsonKey(name: 'started_at') required this.startedAt,
       @JsonKey(name: 'completed_at') this.completedAt,
+      this.title,
       @JsonKey(name: 'was_completed') this.wasCompleted = false})
       : super._();
 
@@ -232,12 +246,14 @@ class _$FocusSessionModelImpl extends _FocusSessionModel {
   @JsonKey(name: 'completed_at')
   final DateTime? completedAt;
   @override
+  final String? title;
+  @override
   @JsonKey(name: 'was_completed')
   final bool wasCompleted;
 
   @override
   String toString() {
-    return 'FocusSessionModel(id: $id, userId: $userId, activityType: $activityType, durationMinutes: $durationMinutes, completedMinutes: $completedMinutes, startedAt: $startedAt, completedAt: $completedAt, wasCompleted: $wasCompleted)';
+    return 'FocusSessionModel(id: $id, userId: $userId, activityType: $activityType, durationMinutes: $durationMinutes, completedMinutes: $completedMinutes, startedAt: $startedAt, completedAt: $completedAt, title: $title, wasCompleted: $wasCompleted)';
   }
 
   @override
@@ -257,14 +273,24 @@ class _$FocusSessionModelImpl extends _FocusSessionModel {
                 other.startedAt == startedAt) &&
             (identical(other.completedAt, completedAt) ||
                 other.completedAt == completedAt) &&
+            (identical(other.title, title) || other.title == title) &&
             (identical(other.wasCompleted, wasCompleted) ||
                 other.wasCompleted == wasCompleted));
   }
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode => Object.hash(runtimeType, id, userId, activityType,
-      durationMinutes, completedMinutes, startedAt, completedAt, wasCompleted);
+  int get hashCode => Object.hash(
+      runtimeType,
+      id,
+      userId,
+      activityType,
+      durationMinutes,
+      completedMinutes,
+      startedAt,
+      completedAt,
+      title,
+      wasCompleted);
 
   @JsonKey(ignore: true)
   @override
@@ -290,6 +316,7 @@ abstract class _FocusSessionModel extends FocusSessionModel {
       @JsonKey(name: 'completed_minutes') required final int completedMinutes,
       @JsonKey(name: 'started_at') required final DateTime startedAt,
       @JsonKey(name: 'completed_at') final DateTime? completedAt,
+      final String? title,
       @JsonKey(name: 'was_completed')
       final bool wasCompleted}) = _$FocusSessionModelImpl;
   const _FocusSessionModel._() : super._();
@@ -317,6 +344,8 @@ abstract class _FocusSessionModel extends FocusSessionModel {
   @override
   @JsonKey(name: 'completed_at')
   DateTime? get completedAt;
+  @override
+  String? get title;
   @override
   @JsonKey(name: 'was_completed')
   bool get wasCompleted;

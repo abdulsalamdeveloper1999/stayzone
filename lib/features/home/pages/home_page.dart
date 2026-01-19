@@ -1,24 +1,18 @@
+import 'dart:ui';
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/routes/app_router.dart';
+import '../../../core/services/sound_service.dart';
+import '../../auth/presentation/bloc/auth_bloc.dart';
 import '../widgets/focus_timer_widget.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/insight_card.dart';
 import '../widgets/sos_urge_widget.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../auth/presentation/bloc/auth_bloc.dart';
-import '../../interventions/pages/reflection_delay_page.dart';
-import '../../interventions/pages/controlled_break_page.dart';
-import '../../../core/services/notification_service.dart';
-import '../../../core/utils/level_utils.dart';
-import '../../focus/domain/usecases/create_focus_session.dart';
-import '../../focus/domain/usecases/complete_focus_session.dart';
-import '../../focus/domain/usecases/get_today_stats.dart';
-import '../../focus/domain/usecases/get_user_streak.dart';
-import '../../urges/domain/usecases/get_today_urges_count.dart';
-import '../../../core/di/injection.dart';
-import '../../../core/services/break_service.dart';
-import '../../../core/services/sound_service.dart';
 import '../widgets/focus_choice_modal.dart';
-import 'dart:async';
+import '../widgets/monk_ticker_widget.dart';
+import '../presentation/cubit/home_cubit.dart';
+import '../presentation/cubit/home_state.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -28,75 +22,20 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
-  Timer? _timer;
-  int _remainingSeconds = 25 * 60; // 25 minutes default
-  int _totalSeconds = 25 * 60;
-
-  // Session tracking
-  String? _currentSessionId;
-  DateTime? _sessionStartTime;
-  String? _currentActivity;
-  int _todayTotalMinutes = 0;
-  int _userStreak = 0;
-  int _todayUrgesCount = 0;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _loadTodayStats();
-    _loadStreak();
-    _loadUrgesCount();
-  }
 
-  Future<void> _loadTodayStats() async {
+    // Load stats on init
     final authState = context.read<AuthBloc>().state;
     if (authState is AuthAuthenticated) {
-      final getTodayStats = getIt<GetTodayStats>();
-      final result = await getTodayStats(authState.user.id);
-      result.fold((failure) {}, (minutes) {
-        if (mounted) {
-          setState(() {
-            _todayTotalMinutes = minutes;
-          });
-        }
-      });
-    }
-  }
-
-  Future<void> _loadStreak() async {
-    final authState = context.read<AuthBloc>().state;
-    if (authState is AuthAuthenticated) {
-      final getUserStreak = getIt<GetUserStreak>();
-      final result = await getUserStreak(authState.user.id);
-      result.fold((failure) {}, (streak) {
-        if (mounted) {
-          setState(() {
-            _userStreak = streak;
-          });
-        }
-      });
-    }
-  }
-
-  Future<void> _loadUrgesCount() async {
-    final authState = context.read<AuthBloc>().state;
-    if (authState is AuthAuthenticated) {
-      final getUrgesCount = getIt<GetTodayUrgesCount>();
-      final result = await getUrgesCount(authState.user.id);
-      result.fold((failure) {}, (count) {
-        if (mounted) {
-          setState(() {
-            _todayUrgesCount = count;
-          });
-        }
-      });
+      context.read<HomeCubit>().loadStats(authState.user.id);
     }
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -104,29 +43,192 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // User returned, cancel everything
-      NotificationService().cancelAll();
-
-      // Calculate break duration if they were on a controlled break
-      if (BreakService().isOnControlledBreak) {
-        setState(() {
-          BreakService().endControlledBreak();
-        });
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated) {
+        context.read<HomeCubit>().loadStats(authState.user.id);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header
-              Row(
+    return BlocBuilder<HomeCubit, HomeState>(
+      builder: (context, state) {
+        final bool isFocused = state.isRunning || state.isPaused;
+
+        // Use a persistent sound toggle visibility check
+        final bool showSoundButton =
+            (state.isRunning || state.isPaused) &&
+            SoundService().currentActivity != null;
+
+        return Scaffold(
+          body: SafeArea(
+            child: isFocused
+                ? _buildFocusedLayout(context, state, showSoundButton)
+                : _buildRegularLayout(context, state),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFocusedLayout(
+    BuildContext context,
+    HomeState state,
+    bool showSoundButton,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: Column(
+        children: [
+          const Spacer(flex: 2),
+          // Centered Timer
+          FocusTimerWidget(
+            time: _formatSeconds(state.remainingSeconds),
+            status: state.isPaused ? 'Paused' : 'Deep Work in Progress',
+            progress: state.remainingSeconds / state.totalSeconds,
+            activityLabel: state.currentActivity,
+            microCopy: _getTimerMicroCopy(state),
+            scarcityMetric: _getScarcityMetric(),
+            onTap: () {}, // No dialog during session
+          ),
+
+          const SizedBox(height: 24),
+
+          // Monk Squad Ticker
+          MonkTickerWidget(
+            activeCount: state.monkActiveCount,
+            recentTitles: state.monkRecentTitles,
+          ),
+
+          if (showSoundButton) ...[
+            const SizedBox(height: 24),
+            _buildSoundToggle(),
+          ],
+
+          const Spacer(flex: 3),
+
+          // Control Buttons at Bottom
+          Padding(
+            padding: const EdgeInsets.only(bottom: 40.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildFocusedButton(
+                  onPressed: () {
+                    if (state.isPaused) {
+                      context.read<HomeCubit>().resumeTimer();
+                    } else {
+                      context.read<HomeCubit>().pauseTimer();
+                    }
+                  },
+                  icon: state.isPaused ? Icons.play_arrow : Icons.pause,
+                  label: state.isPaused ? 'Resume' : 'Pause',
+                  color: state.isPaused
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFFFFA500),
+                ),
+                const SizedBox(width: 16),
+                _buildFocusedButton(
+                  onPressed: () => _confirmStopSession(context),
+                  icon: Icons.stop,
+                  label: 'Stop',
+                  color: const Color(0xFFE11D48),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSoundToggle() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1D1B26),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF8B3DFF).withValues(alpha: 0.3),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            setState(() {
+              SoundService().toggleMute();
+            });
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  SoundService().isMuted ? Icons.volume_off : Icons.volume_up,
+                  color: const Color(0xFF8B3DFF),
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  SoundService().isMuted ? 'Sound Off' : 'Sound On',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFocusedButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 20, color: color),
+      label: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.bold,
+          fontSize: 16,
+        ),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color.withValues(alpha: 0.1),
+        foregroundColor: color,
+        elevation: 0,
+        side: BorderSide(color: color, width: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+    );
+  }
+
+  Widget _buildRegularLayout(BuildContext context, HomeState state) {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header
+          BlocBuilder<AuthBloc, AuthState>(
+            builder: (context, authState) {
+              final name = _getUserName(authState);
+              return Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Column(
@@ -135,20 +237,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       Row(
                         children: [
                           Text(
-                            'Alex • ',
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(color: Colors.grey[400]),
+                            name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.5,
+                            ),
                           ),
+                          const SizedBox(width: 12),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
-                              vertical: 2,
+                              vertical: 4,
                             ),
                             decoration: BoxDecoration(
                               color: const Color(
                                 0xFF8B3DFF,
                               ).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Text(
                               'THE MONK',
@@ -156,310 +263,165 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 color: Color(0xFF8B3DFF),
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
+                                letterSpacing: 1.0,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Ready for focus?',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                      ),
                     ],
                   ),
-                  CircleAvatar(
-                    backgroundColor: const Color(
-                      0xFF8B3DFF,
-                    ).withValues(alpha: 0.2),
-                    child: const Icon(Icons.person, color: Color(0xFF8B3DFF)),
+                  _buildProfileButton(context),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 32),
+
+          // SOS Widget
+          SosUrgeWidget(
+            onTap: () {
+              final authState = context.read<AuthBloc>().state;
+              if (authState is AuthAuthenticated) {
+                _showUrgeOptions(context, authState.user.id);
+              }
+            },
+          ),
+          const SizedBox(height: 32),
+
+          // Monk Squad Ticker
+          MonkTickerWidget(
+            activeCount: state.monkActiveCount,
+            recentTitles: state.monkRecentTitles,
+          ),
+
+          // Timer (Pre-session)
+          FocusTimerWidget(
+            time: _formatSeconds(state.remainingSeconds),
+            status: 'Ready to Focus',
+            progress: state.remainingSeconds / state.totalSeconds,
+            activityLabel: null,
+            microCopy: _getTimerMicroCopy(state),
+            scarcityMetric: _getScarcityMetric(),
+            onTap: () => _showFocusSetup(context),
+          ),
+          const SizedBox(height: 32),
+
+          // Stats Row
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: StatCard(
+                    icon: Icons.timer,
+                    value: _formatMinutesToHoursMinutes(
+                      state.todayTotalMinutes,
+                    ),
+                    label: "Today's Focus",
+                    color: const Color(0xFF8B3DFF),
+                    onTap: () => _showStatInfo(
+                      context,
+                      "Today's Focus",
+                      "Total active time you've spent in focus mode today. Every minute counts toward building your deep work habit.",
+                      Icons.timer,
+                      const Color(0xFF8B3DFF),
+                    ),
                   ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: StatCard(
+                    icon: Icons.block,
+                    value: state.todayUrgesCount.toString(),
+                    label: 'Blocked',
+                    color: const Color(0xFF6366F1),
+                    onTap: () => _showStatInfo(
+                      context,
+                      "Urges Blocked",
+                      "Number of times you resisted a distraction. This includes using SOS tools and completing breathing exercises.",
+                      Icons.block,
+                      const Color(0xFF6366F1),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: StatCard(
+                    icon: Icons.local_fire_department,
+                    value: state.userStreak.toString(),
+                    label: 'Streak',
+                    color: const Color(0xFFE11D48),
+                    onTap: () => _showStatInfo(
+                      context,
+                      "Focus Streak",
+                      "Number of consecutive days you've completed at least one focus session. Don't break the chain!",
+                      Icons.local_fire_department,
+                      const Color(0xFFE11D48),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Analytics Badges
+          if (state.goldenHour != null || state.dangerZone != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20.0),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (state.goldenHour != null)
+                    _buildInsightBadge(
+                      context,
+                      'Golden Hour: ${state.goldenHour}',
+                      Icons.star_rounded,
+                      const Color(0xFFFACC15),
+                    ),
+                  if (state.dangerZone != null)
+                    _buildInsightBadge(
+                      context,
+                      'Danger Zone: ${state.dangerZone}',
+                      Icons.warning_rounded,
+                      const Color(0xFFFB7185),
+                    ),
                 ],
               ),
-              const SizedBox(height: 32),
+            ),
 
-              // SOS Widget
-              SosUrgeWidget(onTap: () => _showUrgeOptions(context)),
-              const SizedBox(height: 32),
-
-              // Timer
-              FocusTimerWidget(
-                time: _formatSeconds(_remainingSeconds),
-                status: _timer != null
-                    ? 'Deep Work in Progress'
-                    : 'Ready to Focus',
-                progress: _remainingSeconds / _totalSeconds,
-                activityLabel: SoundService().currentActivity?.label,
-                microCopy: _getTimerMicroCopy(),
-                scarcityMetric: _getScarcityMetric(),
-                onTap: () => _showFocusSetup(context),
-              ),
-              const SizedBox(height: 32),
-
-              // Stats Row
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: StatCard(
-                        icon: Icons.timer,
-                        value: _formatMinutesToHoursMinutes(_todayTotalMinutes),
-                        label: "Today's Focus",
-                        color: Color(0xFF8B3DFF),
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: StatCard(
-                        icon: Icons.block,
-                        value: _todayUrgesCount.toString(),
-                        label: 'Blocked',
-                        color: Color(0xFF6366F1),
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: StatCard(
-                        icon: Icons.local_fire_department,
-                        value: _userStreak.toString(),
-                        label: 'Streak',
-                        color: Color(0xFFE11D48),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // Break Analytics Info
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1D1B26),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: const Color(0xFF6366F1).withValues(alpha: 0.1),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(
-                              0xFF6366F1,
-                            ).withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.history_toggle_off,
-                            color: Color(0xFF6366F1),
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Daily Break Stats',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                BreakService().totalBreakDuration >
-                                        Duration.zero
-                                    ? 'Total: ${_formatDuration(BreakService().totalBreakDuration)} (${BreakService().totalBreakSessions} sessions)'
-                                    : 'No breaks taken today - Keep it up!',
-                                style: TextStyle(
-                                  color: Colors.grey[400],
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (BreakService().lastBreakDuration != null) ...[
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Divider(color: Color(0xFF231F33), height: 1),
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Last Session',
-                            style: TextStyle(
-                              color: Colors.grey[500],
-                              fontSize: 13,
-                            ),
-                          ),
-                          Text(
-                            _formatDuration(BreakService().lastBreakDuration!),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // Insight
-              const InsightCard(
-                title: 'Focus Insight',
-                message:
-                    'You are most productive between 9am and 12pm. Try scheduling your deep work during these hours.',
-                icon: Icons.auto_awesome,
-              ),
-              const SizedBox(height: 100),
-            ],
-          ),
-        ),
+          // Insight Card
+          _buildDailyInsight(state),
+        ],
       ),
     );
   }
 
-  void _showFocusSetup(BuildContext context) {
-    if (_timer != null) {
-      // If already focusing, show a stop option
-      _showStopFocusDialog(context);
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (modalContext) => FocusChoiceModal(
-        onSelected: (activity, duration) async {
-          final messenger = ScaffoldMessenger.of(context);
-          try {
-            await SoundService().playForActivity(activity);
-
-            // Create session in database
-            final authState = context.read<AuthBloc>().state;
-            if (authState is AuthAuthenticated) {
-              final createSession = getIt<CreateFocusSession>();
-              final result = await createSession(
-                CreateFocusSessionParams(
-                  userId: authState.user.id,
-                  activityType: activity.label,
-                  durationMinutes: duration,
-                ),
-              );
-
-              result.fold(
-                (failure) {
-                  messenger.showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Failed to start session: ${failure.message}',
-                      ),
-                      backgroundColor: Colors.red[900],
-                    ),
-                  );
-                },
-                (session) {
-                  if (!mounted) return;
-                  setState(() {
-                    _currentSessionId = session.id;
-                    _sessionStartTime = DateTime.now();
-                    _currentActivity = activity.label;
-                    _startTimer(duration);
-                  });
-                },
-              );
-            }
-          } catch (e) {
-            if (!mounted) return;
-            messenger.showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Focus sound failed to load. Please check your connection and try again.',
-                ),
-                backgroundColor: Colors.red[900],
-              ),
-            );
-          }
-        },
+  Widget _buildInsightBadge(
+    BuildContext context,
+    String label,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
-    );
-  }
-
-  void _startTimer(int durationMinutes) {
-    _timer?.cancel();
-    _totalSeconds = durationMinutes * 60;
-    _remainingSeconds = _totalSeconds;
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_remainingSeconds > 0) {
-        setState(() {
-          _remainingSeconds--;
-        });
-      } else {
-        _timer?.cancel();
-        // Maybe play a completion sound
-      }
-    });
-  }
-
-  void _stopTimer() {
-    _timer?.cancel();
-    _timer = null;
-    setState(() {
-      _remainingSeconds = 25 * 60; // Reset or keep at 0? Let's reset for now.
-    });
-  }
-
-  void _showStopFocusDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1D1B26),
-        title: const Text(
-          'End Focus Session?',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: Text(
-          SoundService().currentActivity != null
-              ? 'Do you want to stop the ${SoundService().currentActivity?.label} sounds?'
-              : 'Do you want to end your focus session?',
-          style: TextStyle(color: Colors.grey[400]),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Keep Focusing'),
-          ),
-          TextButton(
-            onPressed: () {
-              setState(() {
-                SoundService().stop();
-                _stopTimer();
-              });
-              Navigator.pop(context);
-            },
-            child: const Text(
-              'Stop',
-              style: TextStyle(color: Color(0xFFE11D48)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 14),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
@@ -467,98 +429,302 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  void _showUrgeOptions(BuildContext context) {
+  Widget _buildDailyInsight(HomeState state) {
+    return InsightCard(
+      title: 'Smart Insight',
+      message: state.dailyInsight,
+      icon: Icons.auto_awesome_rounded,
+    );
+  }
+
+  void _showStatInfo(
+    BuildContext context,
+    String title,
+    String description,
+    IconData icon,
+    Color color,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 40),
+          child: Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: const Color(0xFF14111C),
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.1),
+                  blurRadius: 30,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 36),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  description,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 15,
+                    height: 1.5,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: color,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 56),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Got it',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Helper Methods ---
+
+  String _formatSeconds(int seconds) {
+    final minutes = seconds ~/ 60;
+    final secs = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  }
+
+  String _formatMinutesToHoursMinutes(int totalMinutes) {
+    if (totalMinutes < 60) return '${totalMinutes}m';
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+    return minutes == 0 ? '${hours}h' : '${hours}h ${minutes}m';
+  }
+
+  String _getScarcityMetric() {
+    final now = DateTime.now();
+    final remainingHours = 24 - now.hour;
+    return '$remainingHours hours left today';
+  }
+
+  String _getTimerMicroCopy(HomeState state) {
+    if (state.isPaused) return 'Session paused';
+    if (state.isRunning) return 'Deep work in progress';
+    return 'Tap to begin your focused session';
+  }
+
+  void _showFocusSetup(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF14111C),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (modalContext) => FocusChoiceModal(
+        onSelected: (activity, duration, title) async {
+          final messenger = ScaffoldMessenger.of(context);
+          try {
+            await SoundService().playForActivity(activity);
+
+            if (!mounted) return;
+
+            final authState = context.read<AuthBloc>().state;
+            if (authState is AuthAuthenticated) {
+              await context.read<HomeCubit>().startTimer(
+                userId: authState.user.id,
+                activityType: activity.label,
+                durationMinutes: duration,
+                title: title,
+              );
+            }
+          } catch (e) {
+            messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+          }
+        },
       ),
-      builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Choose your path',
+    );
+  }
+
+  void _confirmStopSession(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1625),
+        title: const Text(
+          'Stop Session?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Are you sure you want to stop this focus session? Only completed minutes will be recorded.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              context.read<HomeCubit>().stopTimer();
+            },
+            child: const Text(
+              'Stop',
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
+                color: Color(0xFFE11D48),
                 fontWeight: FontWeight.bold,
               ),
-              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'How can we support you right now?',
-              style: TextStyle(color: Colors.grey[400], fontSize: 14),
-              textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUrgeOptions(BuildContext context, String userId) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+            decoration: BoxDecoration(
+              color: const Color(0xFF14111C).withOpacity(0.85),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(40),
+              ),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.1),
+                width: 1,
+              ),
             ),
-            const SizedBox(height: 32),
-            _buildOptionCard(
-              context,
-              'Reflect & Breathe',
-              'Break the habit with 10 seconds of pause.',
-              Icons.spa_outlined,
-              const Color(0xFF8B3DFF),
-              () {
-                Navigator.pop(sheetContext);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (routeContext) => ReflectionDelayPage(
-                      appName: _getRandomReflectionPrompt(),
-                      onAccepted: () {
-                        Navigator.pop(routeContext);
-                        // Chain into a Controlled Break automatically for safety
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ControlledBreakPage(
-                              appName: 'Social Media',
-                            ),
-                          ),
-                        );
-                      },
-                      onRejected: () {
-                        Navigator.pop(routeContext);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(_getRandomVictoryMessage()),
-                            backgroundColor: const Color(0xFF8B3DFF),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        );
-                      },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            _buildOptionCard(
-              context,
-              'Controlled Break',
-              'Set a timer for a quick, nagging-assisted visit.',
-              Icons.timer_outlined,
-              const Color(0xFF6366F1),
-              () {
-                Navigator.pop(sheetContext);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        const ControlledBreakPage(appName: 'Distractions'),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Urge Intervention',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
                   ),
-                );
-              },
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Choose your path to stay in control",
+                  style: TextStyle(color: Colors.grey[400], fontSize: 15),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                _buildOptionCard(
+                  context,
+                  'Take a timed break',
+                  'Step away with a safety net',
+                  Icons.timer_rounded,
+                  const Color(0xFF10B981),
+                  () {
+                    final router = context.router;
+                    Navigator.pop(context);
+                    router.push(
+                      ReflectionDelayRoute(
+                        appName: 'a break session',
+                        onAccepted: () {
+                          router.replace(
+                            ControlledBreakRoute(appName: 'StayZone'),
+                          );
+                        },
+                        onRejected: () {
+                          context.read<HomeCubit>().reportUrge(
+                            userId: userId,
+                            interventionType: 'reflection_before_break',
+                          );
+                          router.back();
+                        },
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildOptionCard(
+                  context,
+                  'Log my achievements',
+                  'Focus on your wins today',
+                  Icons.stars_rounded,
+                  const Color(0xFF6366F1),
+                  () {
+                    final router = context.router;
+                    Navigator.pop(context);
+                    router.push(const AchievementsRoute());
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildOptionCard(
+                  context,
+                  '1-Minute Breathing',
+                  'Calm your mind and reset',
+                  Icons.spa_rounded,
+                  const Color(0xFF8B3DFF),
+                  () {
+                    final router = context.router;
+                    Navigator.pop(context);
+                    router.push(BreathingRoute(userId: userId));
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 24),
-          ],
+          ),
         ),
       ),
     );
@@ -572,121 +738,96 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     Color color,
     VoidCallback onTap,
   ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1D1B26),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(color: Colors.grey[500], fontSize: 13),
-                  ),
-                ],
-              ),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: const Color(0xFF1D1B26),
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white.withOpacity(0.05)),
             ),
-            const Icon(Icons.chevron_right, color: Colors.grey),
-          ],
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(icon, color: color, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 17,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: Colors.white.withOpacity(0.2),
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, "0");
-    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
-    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
-    return "${duration.inHours > 0 ? '${duration.inHours}:' : ''}$twoDigitMinutes:$twoDigitSeconds";
+  Widget _buildProfileButton(BuildContext context) {
+    return CircleAvatar(
+      backgroundColor: const Color(0xFF8B3DFF).withValues(alpha: 0.2),
+      child: const Icon(Icons.person, color: Color(0xFF8B3DFF)),
+    );
   }
 
-  String _formatSeconds(int seconds) {
-    final minutes = seconds ~/ 60;
-    final secs = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
-  }
+  String _getUserName(AuthState authState) {
+    if (authState is AuthAuthenticated) {
+      String? name = authState.user.name;
+      if (name != null && name.trim().isNotEmpty) {
+        name = name.trim().split(' ')[0];
+      } else {
+        final email = authState.user.email;
+        if (email.contains('@')) {
+          name = email.split('@')[0];
+        }
+      }
 
-  String _formatMinutesToHoursMinutes(int totalMinutes) {
-    if (totalMinutes == 0) return '0m';
-
-    final hours = totalMinutes ~/ 60;
-    final minutes = totalMinutes % 60;
-
-    if (hours == 0) {
-      return '${minutes}m';
-    } else if (minutes == 0) {
-      return '${hours}h';
-    } else {
-      return '${hours}h ${minutes}m';
+      if (name != null && name.isNotEmpty) {
+        return name[0].toUpperCase() + name.substring(1);
+      }
     }
-  }
-
-  String _getRandomVictoryMessage() {
-    final messages = [
-      'Identity Boost: The Monk chose wisdom over habit! +1 Focus',
-      'The urge was strong, but your purpose was stronger. Stay sharp.',
-      'Victory! You just reclaimed 15 minutes of your future self\'s time.',
-      'That deep work muscle just got a little bit stronger. Keep going!',
-      'Level Up: Discipline is a choice, and you just made the right one.',
-      'Silence the noise. Reclaim your focus. Great job, Monk.',
-      'Habit broken. Focus restored. This is how you win the day.',
-    ];
-    return (messages..shuffle()).first;
-  }
-
-  String _getRandomReflectionPrompt() {
-    final prompts = [
-      'Is this a choice or a habit?',
-      'Will this help you become the person you want to be?',
-      'Are you opening this to solve a problem or to escape one?',
-      'If you open this, will you regret it in 15 minutes?',
-      'Your focus is your most valuable asset. Don\'t trade it for cheap dopamine.',
-    ];
-    return (prompts..shuffle()).first;
-  }
-
-  String _getScarcityMetric() {
-    if (_timer == null) {
-      return 'Ready to reclaim your time';
-    }
-    // Assume 16 hour waking day = 57600 seconds
-    final percent = (_remainingSeconds / 57600) * 100;
-    return 'This session is ${percent.toStringAsFixed(1)}% of your waking day';
-  }
-
-  String _getTimerMicroCopy() {
-    if (_timer == null) {
-      return 'The average person checks their phone 58 times a day. Break the cycle.';
-    }
-    final messages = [
-      'Protecting your future self...',
-      'Every second here is a second invested in your excellence.',
-      'The cost of distraction is a life unlived. Stay grounded.',
-      'You are building a monk-like mind, one heartbeat at a time.',
-      'Silence the noise. Your purpose is louder.',
-      'Deep work is not a task. It is a state of being.',
-    ];
-    // We can use the remaining seconds to rotate message every 5 minutes
-    final index = (_remainingSeconds ~/ (5 * 60)) % messages.length;
-    return messages[index];
+    return 'Monk'; // Fallback name
   }
 }

@@ -1,4 +1,4 @@
-package com.example.distract_less
+package com.aetherfocus.app
 
 import io.flutter.embedding.android.FlutterActivity
 

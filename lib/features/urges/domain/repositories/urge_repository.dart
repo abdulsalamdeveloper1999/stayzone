@@ -6,7 +6,10 @@ abstract class UrgeRepository {
   Future<Either<Failure, UrgeReportEntity>> reportUrge({
     required String userId,
     required String interventionType,
+    String? content,
   });
 
   Future<Either<Failure, int>> getTodayUrgesCount(String userId);
+
+  Future<Either<Failure, List<UrgeReportEntity>>> getUrgeHistory(String userId);
 }

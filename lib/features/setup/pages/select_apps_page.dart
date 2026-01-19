@@ -37,7 +37,7 @@ class _SelectAppsPageState extends State<SelectAppsPage> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_ios_new),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Select Apps'),

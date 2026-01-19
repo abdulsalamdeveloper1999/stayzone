@@ -6,6 +6,7 @@ class FocusSessionEntity {
   final int completedMinutes;
   final DateTime startedAt;
   final DateTime? completedAt;
+  final String? title;
   final bool wasCompleted;
 
   const FocusSessionEntity({
@@ -16,6 +17,7 @@ class FocusSessionEntity {
     required this.completedMinutes,
     required this.startedAt,
     this.completedAt,
+    this.title,
     this.wasCompleted = false,
   });
 }

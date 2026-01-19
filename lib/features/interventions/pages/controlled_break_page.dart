@@ -1,8 +1,10 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/services/break_service.dart';
 
+@RoutePage()
 class ControlledBreakPage extends StatefulWidget {
   final String appName;
   final String? appPackage; // For Android
@@ -34,6 +36,15 @@ class _ControlledBreakPageState extends State<ControlledBreakPage> {
     'X (Twitter)': 'twitter://',
   };
 
+  final Map<String, String> _androidPackages = {
+    'Instagram': 'com.instagram.android',
+    'Facebook': 'com.facebook.katana',
+    'YouTube': 'com.google.android.youtube',
+    'Gmail': 'com.google.android.gm',
+    'TikTok': 'com.zhiliaoapp.musically',
+    'X (Twitter)': 'com.twitter.android',
+  };
+
   final Map<String, IconData> _appIcons = {
     'Instagram': Icons.camera_alt_outlined,
     'Facebook': Icons.facebook,
@@ -57,12 +68,33 @@ class _ControlledBreakPageState extends State<ControlledBreakPage> {
 
     // Try to launch the specific app
     try {
-      if (_selectedApp != null && _appSchemes.containsKey(_selectedApp)) {
-        final url = Uri.parse(_appSchemes[_selectedApp]!);
-        if (await canLaunchUrl(url)) {
-          await launchUrl(url);
-        } else {
-          // Fallback for some common apps or just show message
+      if (_selectedApp != null) {
+        bool launched = false;
+
+        // Try URL scheme first (works for both iOS and Android if registered)
+        if (_appSchemes.containsKey(_selectedApp)) {
+          final url = Uri.parse(_appSchemes[_selectedApp]!);
+          if (await canLaunchUrl(url)) {
+            await launchUrl(url);
+            launched = true;
+          }
+        }
+
+        // Android fallback: Launch by package name
+        if (!launched &&
+            Theme.of(context).platform == TargetPlatform.android &&
+            _androidPackages.containsKey(_selectedApp)) {
+          final packageUrl = Uri.parse(
+            'package:${_androidPackages[_selectedApp]}',
+          );
+          if (await canLaunchUrl(packageUrl)) {
+            await launchUrl(packageUrl);
+            launched = true;
+          }
+        }
+
+        if (!launched) {
+          // Fallback message
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

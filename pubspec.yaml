@@ -1,5 +1,5 @@
-name: stayzone
-description: "An app designed to help users remove distractions and focus on their work, enabling better productivity and concentration."
+name: aether_focus
+description: "Aether Focus help users remove distractions and enter a flow state for peak productivity."
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -27,6 +27,11 @@ dependencies:
   timezone: ^0.10.1
   audioplayers: ^6.5.1
   auto_route: ^8.1.0
+  intl: ^0.20.2
+  permission_handler: ^12.0.1
+  purchases_flutter: ^8.11.0
+  shared_preferences: ^2.2.2
+  equatable: ^2.0.8
 
 dev_dependencies:
   flutter_test:

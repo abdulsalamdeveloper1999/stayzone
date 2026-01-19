@@ -15,7 +15,7 @@ import '../../domain/usecases/delete_account_usecase.dart';
 part 'auth_event.dart';
 part 'auth_state.dart';
 
-@injectable
+@lazySingleton
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final SignInUsingEmail _signInUsingEmail;
   final SignUpUsingEmail _signUpUsingEmail;

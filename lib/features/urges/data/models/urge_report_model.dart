@@ -13,6 +13,7 @@ class UrgeReportModel with _$UrgeReportModel {
     @JsonKey(name: 'user_id') required String userId,
     @JsonKey(name: 'intervention_type') required String interventionType,
     @JsonKey(name: 'reported_at') required DateTime reportedAt,
+    String? content,
   }) = _UrgeReportModel;
 
   factory UrgeReportModel.fromJson(Map<String, dynamic> json) =>
@@ -24,6 +25,7 @@ class UrgeReportModel with _$UrgeReportModel {
       userId: userId,
       interventionType: interventionType,
       reportedAt: reportedAt,
+      content: content,
     );
   }
 }

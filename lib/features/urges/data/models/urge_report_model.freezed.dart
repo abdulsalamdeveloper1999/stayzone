@@ -27,6 +27,7 @@ mixin _$UrgeReportModel {
   String get interventionType => throw _privateConstructorUsedError;
   @JsonKey(name: 'reported_at')
   DateTime get reportedAt => throw _privateConstructorUsedError;
+  String? get content => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -44,7 +45,8 @@ abstract class $UrgeReportModelCopyWith<$Res> {
       {String id,
       @JsonKey(name: 'user_id') String userId,
       @JsonKey(name: 'intervention_type') String interventionType,
-      @JsonKey(name: 'reported_at') DateTime reportedAt});
+      @JsonKey(name: 'reported_at') DateTime reportedAt,
+      String? content});
 }
 
 /// @nodoc
@@ -64,6 +66,7 @@ class _$UrgeReportModelCopyWithImpl<$Res, $Val extends UrgeReportModel>
     Object? userId = null,
     Object? interventionType = null,
     Object? reportedAt = null,
+    Object? content = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -82,6 +85,10 @@ class _$UrgeReportModelCopyWithImpl<$Res, $Val extends UrgeReportModel>
           ? _value.reportedAt
           : reportedAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      content: freezed == content
+          ? _value.content
+          : content // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -98,7 +105,8 @@ abstract class _$$UrgeReportModelImplCopyWith<$Res>
       {String id,
       @JsonKey(name: 'user_id') String userId,
       @JsonKey(name: 'intervention_type') String interventionType,
-      @JsonKey(name: 'reported_at') DateTime reportedAt});
+      @JsonKey(name: 'reported_at') DateTime reportedAt,
+      String? content});
 }
 
 /// @nodoc
@@ -116,6 +124,7 @@ class __$$UrgeReportModelImplCopyWithImpl<$Res>
     Object? userId = null,
     Object? interventionType = null,
     Object? reportedAt = null,
+    Object? content = freezed,
   }) {
     return _then(_$UrgeReportModelImpl(
       id: null == id
@@ -134,6 +143,10 @@ class __$$UrgeReportModelImplCopyWithImpl<$Res>
           ? _value.reportedAt
           : reportedAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      content: freezed == content
+          ? _value.content
+          : content // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -145,7 +158,8 @@ class _$UrgeReportModelImpl extends _UrgeReportModel {
       {required this.id,
       @JsonKey(name: 'user_id') required this.userId,
       @JsonKey(name: 'intervention_type') required this.interventionType,
-      @JsonKey(name: 'reported_at') required this.reportedAt})
+      @JsonKey(name: 'reported_at') required this.reportedAt,
+      this.content})
       : super._();
 
   factory _$UrgeReportModelImpl.fromJson(Map<String, dynamic> json) =>
@@ -162,10 +176,12 @@ class _$UrgeReportModelImpl extends _UrgeReportModel {
   @override
   @JsonKey(name: 'reported_at')
   final DateTime reportedAt;
+  @override
+  final String? content;
 
   @override
   String toString() {
-    return 'UrgeReportModel(id: $id, userId: $userId, interventionType: $interventionType, reportedAt: $reportedAt)';
+    return 'UrgeReportModel(id: $id, userId: $userId, interventionType: $interventionType, reportedAt: $reportedAt, content: $content)';
   }
 
   @override
@@ -178,13 +194,14 @@ class _$UrgeReportModelImpl extends _UrgeReportModel {
             (identical(other.interventionType, interventionType) ||
                 other.interventionType == interventionType) &&
             (identical(other.reportedAt, reportedAt) ||
-                other.reportedAt == reportedAt));
+                other.reportedAt == reportedAt) &&
+            (identical(other.content, content) || other.content == content));
   }
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, id, userId, interventionType, reportedAt);
+  int get hashCode => Object.hash(
+      runtimeType, id, userId, interventionType, reportedAt, content);
 
   @JsonKey(ignore: true)
   @override
@@ -203,12 +220,12 @@ class _$UrgeReportModelImpl extends _UrgeReportModel {
 
 abstract class _UrgeReportModel extends UrgeReportModel {
   const factory _UrgeReportModel(
-          {required final String id,
-          @JsonKey(name: 'user_id') required final String userId,
-          @JsonKey(name: 'intervention_type')
-          required final String interventionType,
-          @JsonKey(name: 'reported_at') required final DateTime reportedAt}) =
-      _$UrgeReportModelImpl;
+      {required final String id,
+      @JsonKey(name: 'user_id') required final String userId,
+      @JsonKey(name: 'intervention_type')
+      required final String interventionType,
+      @JsonKey(name: 'reported_at') required final DateTime reportedAt,
+      final String? content}) = _$UrgeReportModelImpl;
   const _UrgeReportModel._() : super._();
 
   factory _UrgeReportModel.fromJson(Map<String, dynamic> json) =
@@ -225,6 +242,8 @@ abstract class _UrgeReportModel extends UrgeReportModel {
   @override
   @JsonKey(name: 'reported_at')
   DateTime get reportedAt;
+  @override
+  String? get content;
   @override
   @JsonKey(ignore: true)
   _$$UrgeReportModelImplCopyWith<_$UrgeReportModelImpl> get copyWith =>

@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -34,6 +35,18 @@ class NotificationService {
         // Handle notification tap
       },
     );
+
+    // Request permissions for Android 13+
+    await requestPermissions();
+  }
+
+  Future<void> requestPermissions() async {
+    if (await Permission.notification.isDenied) {
+      await Permission.notification.request();
+    }
+
+    // For iOS, the plugin handles it during initialize,
+    // but we can also use permission_handler if needed for consistency.
   }
 
   Future<void> scheduleNaggingNotifications({

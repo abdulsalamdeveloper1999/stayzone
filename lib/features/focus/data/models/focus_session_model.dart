@@ -16,6 +16,7 @@ class FocusSessionModel with _$FocusSessionModel {
     @JsonKey(name: 'completed_minutes') required int completedMinutes,
     @JsonKey(name: 'started_at') required DateTime startedAt,
     @JsonKey(name: 'completed_at') DateTime? completedAt,
+    String? title,
     @JsonKey(name: 'was_completed') @Default(false) bool wasCompleted,
   }) = _FocusSessionModel;
 
@@ -31,6 +32,7 @@ class FocusSessionModel with _$FocusSessionModel {
       completedMinutes: completedMinutes,
       startedAt: startedAt,
       completedAt: completedAt,
+      title: title,
       wasCompleted: wasCompleted,
     );
   }

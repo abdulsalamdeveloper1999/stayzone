@@ -7,6 +7,8 @@ import '../../../core/routes/app_router.dart';
 import '../../../core/utils/level_utils.dart';
 import '../../../core/utils/string_extensions.dart';
 import '../../auth/presentation/bloc/auth_bloc.dart';
+import '../../home/presentation/cubit/home_cubit.dart';
+import '../../home/presentation/cubit/home_state.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -183,20 +185,28 @@ class SettingsPage extends StatelessWidget {
 
   Widget _buildStatsRow(int totalMinutes) {
     final hours = (totalMinutes / 60).toStringAsFixed(1);
-    return Row(
-      children: [
-        Expanded(
-          child: _buildStatItem(
-            'Total Focus',
-            '$hours hrs',
-            CupertinoIcons.time,
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _buildStatItem('Streak', '5 days', CupertinoIcons.flame),
-        ),
-      ],
+    return BlocBuilder<HomeCubit, HomeState>(
+      builder: (context, state) {
+        return Row(
+          children: [
+            Expanded(
+              child: _buildStatItem(
+                'Total Focus',
+                '$hours hrs',
+                CupertinoIcons.time,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildStatItem(
+                'Streak',
+                '${state.userStreak} days',
+                CupertinoIcons.flame,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
